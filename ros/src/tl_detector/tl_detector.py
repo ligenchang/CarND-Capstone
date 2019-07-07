@@ -58,8 +58,36 @@ class TLDetector(object):
         self.state_count = 0
 
         self.tl_closest_wp = None       # Will contain a dict: light id -> closest waypoint idx
-        self.dropped_images = 0         # Used to know when to run image classification
-        rospy.spin()
+
+        self.loop()
+
+    def loop(self):
+        rate = rospy.Rate(2)
+        while not rospy.is_shutdown():
+            if self.tl_closest_wp is not None and self.lights and self.pose:
+                self.process_image()
+
+            rate.sleep()
+
+    def process_image(self):
+        light_wp, state = self.process_traffic_lights()
+        '''
+        Publish upcoming red lights at camera frequency.
+        Each predicted state has to occur `STATE_COUNT_THRESHOLD` number
+        of times till we start using it. Otherwise the previous stable state is
+        used.
+        '''
+        if self.state != state:
+            self.state_count = 0
+            self.state = state
+        elif self.state_count >= STATE_COUNT_THRESHOLD:
+            self.last_state = self.state
+            light_wp = light_wp if state == TrafficLight.RED else -1
+            self.last_wp = light_wp
+            self.upcoming_red_light_pub.publish(Int32(light_wp))
+        else:
+            self.upcoming_red_light_pub.publish(Int32(self.last_wp))
+        self.state_count += 1
 
     def pose_cb(self, msg):
         self.pose = msg
@@ -86,33 +114,8 @@ class TLDetector(object):
             msg (Image): image from car-mounted camera
 
         """
-        # Process only 1 every 4 pictures
-        if self.dropped_images < 4:
-            self.dropped_images += 1
-            return
-
-        self.dropped_images = 0
         self.has_image = True
         self.camera_image = msg
-        light_wp, state = self.process_traffic_lights()
-
-        '''
-        Publish upcoming red lights at camera frequency.
-        Each predicted state has to occur `STATE_COUNT_THRESHOLD` number
-        of times till we start using it. Otherwise the previous stable state is
-        used.
-        '''
-        if self.state != state:
-            self.state_count = 0
-            self.state = state
-        elif self.state_count >= STATE_COUNT_THRESHOLD:
-            self.last_state = self.state
-            light_wp = light_wp if state == TrafficLight.RED else -1
-            self.last_wp = light_wp
-            self.upcoming_red_light_pub.publish(Int32(light_wp))
-        else:
-            self.upcoming_red_light_pub.publish(Int32(self.last_wp))
-        self.state_count += 1
 
     def get_closest_waypoint(self, x, y):
         """Identifies the closest path waypoint to the given position
@@ -124,7 +127,26 @@ class TLDetector(object):
             int: index of the closest waypoint in self.waypoints
 
         """
-        return self.waypoint_tree.query([x, y], 1)[1]
+        closest_idx = self.waypoint_tree.query([x, y], 1)[1]
+
+        ###############
+        # Check where closest is relative to x and y
+        ###############
+        closest_coord = self.waypoints_2d[closest_idx]
+        prev_coord = self.waypoints_2d[closest_idx - 1]
+
+        # Equation for hyperplane through closes_coord
+        cl_vect = np.array(closest_coord)
+        prev_vect = np.array(prev_coord)
+        pos_vect = np.array([x, y])
+
+        val = np.dot(cl_vect - prev_vect, pos_vect - cl_vect)
+
+        # Closest point was behind, so take next one
+        if val > 0:
+            closest_idx = (closest_idx + 1) % len(self.waypoints_2d)
+
+        return closest_idx
 
     def get_light_state(self, light):
         """Determines the current color of the traffic light
