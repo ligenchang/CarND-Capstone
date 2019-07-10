@@ -14,6 +14,8 @@ from scipy.spatial import KDTree
 import tf
 import cv2
 import yaml
+import PyKDL
+
 
 STATE_COUNT_THRESHOLD = 3
 
@@ -50,7 +52,12 @@ class TLDetector(object):
 
         self.bridge = CvBridge()
         self.light_classifier = TLClassifier()
+
         self.listener = tf.TransformListener()
+        self.focal_x = self.config['camera_info'].get('focal_length_x', 2300)
+        self.focal_y = self.config['camera_info'].get('focal_length_y', 2300)
+        self.image_width = self.config['camera_info']['image_width']
+        self.image_height = self.config['camera_info']['image_height']
 
         self.state = TrafficLight.UNKNOWN
         self.last_state = TrafficLight.UNKNOWN
@@ -148,6 +155,31 @@ class TLDetector(object):
 
         return closest_idx
 
+    def get_image_coordinates(self, map_coords):
+        """
+        Get image coordinates from map coordinates
+        """
+        # ROS is nice and can provide the transformation
+        try:
+            now = rospy.Time.now()
+            self.listener.waitForTransform("/base_link", "/world", now, rospy.Duration(1.0))
+            (trans, rot) = self.listener.lookupTransform("/base_link", "/world", now)
+
+        except (tf.Exception, tf.LookupException, tf.ConnectivityException):
+            rospy.logerr("Failed to find transformation to image coordinates")
+            return -1, -1
+
+        # Apply transformation
+        piw = PyKDL.Vector(map_coords.x, map_coords.y, map_coords.z)
+        rot = PyKDL.Rotation.Quaternion(*rot)
+        trans = PyKDL.Vector(*trans)
+        p_car = rot * piw + trans
+
+        x = - p_car[1] / p_car[0] * self.focal_x + self.image_width / 2
+        y = - p_car[2] / p_car[0] * self.focal_y + self.image_height / 2 + 340
+
+        return int(x), int(y)
+
     def get_light_state(self, light):
         """Determines the current color of the traffic light
 
@@ -158,15 +190,32 @@ class TLDetector(object):
             int: ID of traffic light color (specified in styx_msgs/TrafficLight)
 
         """
+        if not self.has_image:
+            self.last_state = None
+            return TrafficLight.UNKNOWN
+
+        cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
+
+        # Get the image coordinates of the light
+        light_x, light_y = self.get_image_coordinates(light.pose.pose.position)
+
+        # If outside the frame, then it is unknown
+        if light_x < 0 or light_x > self.image_width or light_y < 0 or light_y > self.image_height:
+            return TrafficLight.UNKNOWN
+
+        # Crop the image around it
+        width, height = 180, 180
+        x_min = max(light_x - width // 2, 0)
+        x_max = min(light_x + width // 2, self.image_width)
+        y_min = max(light_y - height // 2, 0)
+        y_max = min(light_y + height // 2, self.image_height)
+
+        cropped_light = cv_image[y_min: y_max, x_min: x_max]
+        # cv2.imwrite("/home/student/output/cropped_" + str(rospy.Time.now()) + ".png", cropped_light)
+
+        # Classify the box
         return light.state
-        # if not self.has_image:
-        #     self.prev_light_loc = None
-        #     return False
-        #
-        # cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
-        #
-        # #Get classification
-        # return self.light_classifier.get_classification(cv_image)
+        #return self.light_classifier.get_classification(cropped_light)
 
     def process_traffic_lights(self):
         """Finds closest visible traffic light, if one exists, and determines its
