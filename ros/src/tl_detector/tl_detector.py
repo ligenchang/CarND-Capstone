@@ -9,6 +9,7 @@ from styx_msgs.msg import Lane
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 from light_classification.tl_classifier import TLClassifier
+from light_classification.tl_cv_classifier import TLCVClassifier
 from scipy.spatial import KDTree
 
 import tf
@@ -51,7 +52,8 @@ class TLDetector(object):
         self.upcoming_red_light_pub = rospy.Publisher('/traffic_waypoint', Int32, queue_size=1)
 
         self.bridge = CvBridge()
-        self.light_classifier = TLClassifier()
+        # self.light_classifier = TLClassifier()
+        self.light_classifier = TLCVClassifier()
 
         self.listener = tf.TransformListener()
         self.focal_x = self.config['camera_info'].get('focal_length_x', 2300)
@@ -211,11 +213,11 @@ class TLDetector(object):
         y_max = min(light_y + height // 2, self.image_height)
 
         cropped_light = cv_image[y_min: y_max, x_min: x_max]
-        # cv2.imwrite("/home/student/output/cropped_" + str(rospy.Time.now()) + ".png", cropped_light)
+        #cv2.imwrite("/home/student/output/cropped_" + str(rospy.Time.now()) + ".png", cropped_light)
 
         # Classify the box
-        return light.state
-        #return self.light_classifier.get_classification(cropped_light)
+        #return light.state
+        return self.light_classifier.get_classification(cropped_light)
 
     def process_traffic_lights(self):
         """Finds closest visible traffic light, if one exists, and determines its
