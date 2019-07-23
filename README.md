@@ -1,8 +1,8 @@
-Team Members
-Michael Li - genchang.li@gmail.com
-Dean Hart - boardthatpowder@gmail.com
-Krishna Satish - Krishna.Satish@kpit.com
-Albert Jordan - albert.jordan@mac.com
+### Team Members
+* Michael Li - genchang.li@gmail.com
+* Dean Hart - boardthatpowder@gmail.com
+* Krishna Satish - Krishna.Satish@kpit.com
+* Albert Jordan - albert.jordan@mac.com
 
 
 
