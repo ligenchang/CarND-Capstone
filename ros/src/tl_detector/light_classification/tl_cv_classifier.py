@@ -13,8 +13,8 @@ class TLCVClassifier(object):
         self.hsv_red_low_high = (10, 255, 255)
         self.hsv_red_high_low = (160, 50, 80)
         self.hsv_red_high_high = (179, 255, 255)
-        self.hsv_yellow_low = (25, 100, 100)
-        self.hsv_yellow_high = (30, 255, 255)
+        self.hsv_yellow_low = (28, 100, 100)
+        self.hsv_yellow_high = (32, 255, 255)
         self.hsv_green_low = (50, 90, 50)
         self.hsv_green_high = (70, 255, 255)
         self.distance_min = 15
@@ -74,8 +74,8 @@ class TLCVClassifier(object):
             mask_2 = cv2.inRange(hsv_image, 
                 np.array(color_range_2_low, dtype = "uint8"),
                 np.array(color_range_2_high, dtype = "uint8"))
-            mask = cv2.addWeighted(mask_1, 1.0, mask_2, 1.0, 0.0)
-            mask = cv2.GaussianBlur(mask,(5,5),0)
+            mask = cv2.addWeighted(mask_1, 1.2, mask_2, 1.0, 0.0)
+            mask = cv2.GaussianBlur(mask,(1,1),0)
         else:
             mask = cv2.inRange(hsv_image, color_range_1_low, color_range_1_high)
 
