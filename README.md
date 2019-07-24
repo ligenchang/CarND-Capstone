@@ -1,10 +1,9 @@
 ### Team Members
-* Michael Li - genchang.li@gmail.com
+* Genchang Li - genchang.li@gmail.com
 * Dean Hart - boardthatpowder@gmail.com
 * Jean-Noel delavalade - jn.delavalade@hotmail.com
 * Krishna Satish - Krishna.Satish@kpit.com
 * Albert Jordan - albert.jordan@mac.com
-
 
 
 
